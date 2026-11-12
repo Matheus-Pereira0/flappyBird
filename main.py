@@ -4,13 +4,13 @@ import pygame
 from config import SCREEN, CLOCK, WIDTH
 from game import Game
 
-# LOOP PRINCIPAL
+# CICLO PRINCIPAL
 # ============================================================
-# Em cada frame o jogo: lê eventos -> atualiza a lógica -> desenha -> espera.
+# Em cada quadro o jogo: lê eventos -> atualiza a lógica -> desenha -> espera.
 def main():
     game = Game()
 
-    # Loop infinito da partida; termina somente ao fechar a janela/ESC.
+    # Ciclo infinito da partida; termina ao fechar a janela ou pressionar ESC.
     while True:
         # 1) Ler teclado, mouse e eventos da janela.
         for event in pygame.event.get():
@@ -23,7 +23,10 @@ def main():
                     pygame.quit()
                     sys.exit()
 
-                if event.key in (pygame.K_SPACE, pygame.K_UP, pygame.K_w):
+                if game.state == "tutorial":
+                    if event.key in (pygame.K_RETURN, pygame.K_SPACE, pygame.K_UP, pygame.K_w):
+                        game.start()
+                elif event.key in (pygame.K_SPACE, pygame.K_UP, pygame.K_w):
                     game.flap()
                 elif event.key in (pygame.K_x, pygame.K_f):
                     game.shoot()
@@ -41,10 +44,12 @@ def main():
                         game.reset()
 
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                if game.state == "playing":
+                if game.state == "tutorial":
+                    game.start()
+                elif game.state == "playing":
                     game.flap()
                 elif game.state == "upgrade":
-                    # Click cards as an alternative to 1/2/3.
+                    # Também permite escolher um cartão com o mouse.
                     mx, my = event.pos
                     card_w, card_h = 245, 280
                     gap = 25
@@ -64,10 +69,10 @@ def main():
         # 2) Atualizar física, obstáculos, moedas, colisões e progressão.
         game.update()
 
-        # 3) Desenhar o frame atual.
+        # 3) Desenhar o quadro atual.
         game.draw(SCREEN)
 
-        # Enviar o frame para a janela e limitar a aproximadamente 60 FPS.
+        # Enviar o quadro à janela e limitar a aproximadamente 60 quadros por segundo.
         pygame.display.flip()
         CLOCK.tick(60)
 

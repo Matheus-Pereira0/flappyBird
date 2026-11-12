@@ -4,7 +4,7 @@ import random
 import pygame
 from config import *
 
-# BIRD - jogador
+# PÁSSARO - jogador
 # ============================================================
 # Esta classe guarda a posição, física, vida e upgrades do pássaro.
 class Bird:
@@ -13,6 +13,8 @@ class Bird:
         self.y = HEIGHT // 2
         self.vy = 0
         self.radius = 18
+        self.animation_timer = 0
+        self.animation_frame = 0
 
         self.base_gravity = 0.43
         self.flap_power = -7.6
@@ -32,7 +34,7 @@ class Bird:
         self.invuln = 0
         self.revive_available = False
 
-    # Calcula a gravidade atual. Cada upgrade reduz a gravidade.
+    # Calcula a gravidade atual. Cada melhoria reduz a gravidade.
     def gravity(self):
         return self.base_gravity * (0.92 ** getattr(self, "gravity_upgrades", 0))
 
@@ -40,7 +42,7 @@ class Bird:
     def flap(self):
         self.vy = self.flap_power - (0.18 * getattr(self, "flap_upgrades", 0))
 
-    # Atualiza a física do pássaro a cada frame.
+    # Atualiza a física do pássaro a cada quadro.
     def update(self):
         self.vy += self.gravity()
         self.y += self.vy
@@ -48,7 +50,12 @@ class Bird:
         if self.invuln > 0:
             self.invuln -= 1
 
-    # Aplica dano e verifica armadura/revive. Retorna True se morrer.
+        self.animation_timer += 1
+        if self.animation_timer >= 6:
+            self.animation_timer = 0
+            self.animation_frame = (self.animation_frame + 1) % len(BIRD_FRAMES)
+
+    # Aplica dano e verifica armadura/ressurreição. Retorna True se morrer.
     def hurt(self, incoming_damage=1):
         if self.invuln > 0:
             return False
@@ -67,39 +74,16 @@ class Bird:
 
         return self.hp <= 0
 
-    # Desenha o pássaro usando apenas formas do Pygame.
+    # Desenha o quadro atual da animação do pássaro.
     def draw(self, surface):
         if self.invuln > 0 and (self.invuln // 5) % 2 == 0:
             return
 
-        # body
-        pygame.draw.circle(surface, YELLOW, (int(self.x), int(self.y)), self.radius)
-
-        # wing
-        wing_y = int(self.y + max(-8, min(10, self.vy * 1.2)))
-        pygame.draw.ellipse(
-            surface,
-            ORANGE,
-            (int(self.x - 17), wing_y - 5, 19, 12)
-        )
-
-        # eye
-        pygame.draw.circle(surface, WHITE, (int(self.x + 7), int(self.y - 7)), 7)
-        pygame.draw.circle(surface, BLACK, (int(self.x + 9), int(self.y - 7)), 3)
-
-        # beak
-        pygame.draw.polygon(
-            surface,
-            ORANGE,
-            [
-                (self.x + 16, self.y - 1),
-                (self.x + 31, self.y + 5),
-                (self.x + 16, self.y + 9),
-            ],
-        )
+        sprite = BIRD_FRAMES[self.animation_frame]
+        surface.blit(sprite, sprite.get_rect(center=(int(self.x), int(self.y))))
 
 
-# PROJECTILE - tiro do jogador ou dos canos
+# PROJÉTIL - disparo do jogador ou dos canos
 # ============================================================
 class Projectile:
     def __init__(self, x, y, velocity_x, color, damage=1):
@@ -131,9 +115,9 @@ class Projectile:
 
 # ============================================================
 
-# PIPE - obstáculo
+# CANO - obstáculo
 # ============================================================
-# Cada Pipe representa os dois canos e a abertura entre eles.
+# Cada cano representa as duas partes do obstáculo e a abertura entre elas.
 class Pipe:
     def __init__(self, x, gap_y, gap_size, width=75, blocked=False, shooter=False, level=1):
         self.x = x
@@ -178,41 +162,28 @@ class Pipe:
     def offscreen(self):
         return self.x + self.width < 0
 
-    # Desenha o pássaro usando apenas formas do Pygame.
+    # Desenha os canos com o sprite orientado para dentro da abertura.
     def draw(self, surface):
         top = self.rect_top
         bottom = self.rect_bottom
-        pipe_dark = RED if self.blocked else (PURPLE if self.shooter else GREEN_DARK)
-        pipe_light = ORANGE if self.blocked else (BLUE if self.shooter else GREEN)
 
-        pygame.draw.rect(surface, pipe_dark, top)
-        pygame.draw.rect(surface, pipe_light, top.inflate(-8, 0))
-
-        pygame.draw.rect(surface, pipe_dark, bottom)
-        pygame.draw.rect(surface, pipe_light, bottom.inflate(-8, 0))
-
-        # Pipe lips
-        lip_h = 22
-        pygame.draw.rect(
-            surface,
-            pipe_dark,
-            (top.x - 5, top.bottom - lip_h, top.width + 10, lip_h)
-        )
-        pygame.draw.rect(
-            surface,
-            pipe_dark,
-            (bottom.x - 5, bottom.y, bottom.width + 10, lip_h)
-        )
+        for rect, flip_vertical in ((top, True), (bottom, False)):
+            sprite = pygame.transform.scale(PIPE_SPRITE, rect.size)
+            if flip_vertical:
+                sprite = pygame.transform.flip(sprite, False, True)
+            surface.blit(sprite, rect)
 
         if self.blocked:
             pygame.draw.line(surface, WHITE, (self.x + 12, self.gap_y - 18), (self.x + self.width - 12, self.gap_y + 18), 4)
             pygame.draw.line(surface, WHITE, (self.x + self.width - 12, self.gap_y - 18), (self.x + 12, self.gap_y + 18), 4)
+        elif self.shooter:
+            pygame.draw.circle(surface, BLUE, (int(self.x + self.width / 2), int(self.gap_y)), 9)
 
 # ============================================================
 
-# COIN - moeda
+# MOEDA
 # ============================================================
-# Moedas dão pontos e podem ser atraídas pelo upgrade Magnet.
+# Moedas dão pontos e podem ser atraídas pela melhoria Ímã.
 class Coin:
     def __init__(self, x, y):
         self.x = x
@@ -225,7 +196,7 @@ class Coin:
         self.x -= speed
         self.phase += 0.08
 
-    # Desenha o pássaro usando apenas formas do Pygame.
+    # Desenha a moeda pulsante.
     def draw(self, surface):
         if self.collected:
             return

@@ -5,14 +5,15 @@ import pygame
 from config import *
 from entities import Bird, Pipe, Coin, Projectile
 
-# GAME - lógica principal
+# JOGO - lógica principal
 # ============================================================
-# Controla a run inteira: salas, dificuldade, colisões, upgrades,
+# Controla a partida: salas, dificuldade, colisões, melhorias,
 # pontuação, estados da partida e desenho da interface.
 class Game:
     def __init__(self):
         self.best = 0
         self.reset()
+        self.state = "tutorial"
 
     def reset(self):
         self.bird = Bird()
@@ -45,10 +46,6 @@ class Game:
         self.message_timer = 0
 
         self.ground_scroll = 0
-        self.clouds = [
-            [random.randint(0, WIDTH), random.randint(50, 250), random.randint(40, 90)]
-            for _ in range(7)
-        ]
 
     # A dificuldade aumenta conforme o jogador avança pelas salas.
     def difficulty(self):
@@ -57,7 +54,7 @@ class Game:
     # Calcula o tamanho da abertura dos canos. Quanto maior a dificuldade,
     # menor é a abertura.
     def current_gap(self):
-        # Starts generous, then narrows.
+        # Começa ampla e diminui conforme a dificuldade aumenta.
         return max(118, 205 - self.difficulty() * 9)
 
     def current_speed(self):
@@ -84,19 +81,19 @@ class Game:
         )
         self.pipes.append(pipe)
 
-        # Coins have a chance to appear.
+        # Há uma chance de aparecerem moedas.
         coin_chance = min(0.85, 0.42 + self.bird.coin_bonus * 0.08)
         if random.random() < coin_chance:
-            # Put the coin in or near the gap.
+            # Posiciona a moeda dentro ou perto da abertura.
             cy = center + random.randint(-int(gap * 0.3), int(gap * 0.3))
             self.coins.append(Coin(WIDTH + 68, cy))
 
-    # Entra no estado de escolha de upgrade depois de limpar uma sala.
+    # Entra no estado de escolha de melhoria depois de limpar uma sala.
     def begin_upgrade(self):
         self.state = "upgrade"
         self.upgrade_choices = random.sample(UPGRADE_POOL, 3)
 
-    # Aplica o upgrade escolhido (0, 1 ou 2).
+    # Aplica a melhoria escolhida (0, 1 ou 2).
     def apply_upgrade(self, index):
         if not (0 <= index < len(self.upgrade_choices)):
             return
@@ -136,7 +133,7 @@ class Game:
         self.room += 1
         self.room_progress = 0
 
-        # Clear the current obstacles so the new room feels distinct.
+        # Remove os obstáculos atuais para diferenciar a nova sala.
         self.pipes.clear()
         self.coins.clear()
         self.spawn_timer = 20
@@ -147,7 +144,11 @@ class Game:
         if self.state == "playing":
             self.bird.flap()
 
-    # Dispara para frente; o cooldown evita que a tecla vire um tiro contínuo.
+    def start(self):
+        if self.state == "tutorial":
+            self.state = "playing"
+
+    # Dispara para frente; o intervalo evita tiros contínuos ao manter a tecla.
     def shoot(self):
         if self.state == "playing" and self.weapon_cooldown <= 0:
             self.projectiles.append(
@@ -171,7 +172,7 @@ class Game:
             leveled_up = True
 
         if leveled_up:
-            self.message = f"Level up! Level {self.level}"
+            self.message = f"Subiu de nível! Nível {self.level}"
             self.message_timer = 140
 
     def update_projectiles(self):
@@ -232,10 +233,10 @@ class Game:
             if self.bird.hurt():
                 self.game_over()
             else:
-                # Push away from the collision slightly.
+                # Afasta o pássaro um pouco após a colisão.
                 self.bird.vy = -3
 
-    # Coleta moedas dentro do raio normal ou aumentado pelo Magnet.
+    # Coleta moedas dentro do raio normal ou aumentado pela melhoria Ímã.
     def collect_coins(self):
         for coin in self.coins:
             if coin.collected:
@@ -252,7 +253,7 @@ class Game:
                 self.coins_collected += 1
                 self.score += int(25 * self.bird.score_multiplier)
 
-    # Atualiza a física do pássaro a cada frame.
+    # Atualiza a física do pássaro a cada quadro.
     def update(self):
         if self.state != "playing":
             return
@@ -267,7 +268,7 @@ class Game:
         self.spawn_timer -= 1
         if self.spawn_timer <= 0:
             self.spawn_pipe()
-            # Harder rooms have pipes slightly closer together.
+            # Nas salas mais difíceis, os canos ficam um pouco mais próximos.
             self.spawn_interval = max(63, 96 - self.difficulty() * 3)
             self.spawn_timer = self.spawn_interval
 
@@ -297,7 +298,7 @@ class Game:
 
         self.distance += speed
 
-        # Every room_length passed pipes, offer an upgrade.
+        # Oferece uma melhoria a cada room_length canos ultrapassados.
         if self.room_progress >= self.room_length:
             self.begin_upgrade()
 
@@ -307,41 +308,16 @@ class Game:
         if self.message_timer > 0:
             self.message_timer -= 1
 
-    # Encerra a run e mostra a tela de Game Over.
+    # Encerra a partida e mostra a tela de fim de jogo.
     def game_over(self):
         self.state = "game_over"
         self.best = max(self.best, self.score)
 
-    # Desenha o céu, nuvens e chão.
+    # Desenha o cenário e o chão.
     def draw_background(self, surface):
-        # Simple vertical sky gradient.
-        for y in range(HEIGHT):
-            t = y / HEIGHT
-            c = (
-                int(SKY[0] * (1 - t) + SKY_DARK[0] * t),
-                int(SKY[1] * (1 - t) + SKY_DARK[1] * t),
-                int(SKY[2] * (1 - t) + SKY_DARK[2] * t),
-            )
-            pygame.draw.line(surface, c, (0, y), (WIDTH, y))
+        surface.blit(BACKGROUND_SPRITE, (0, 0))
 
-        # Clouds
-        for cloud in self.clouds:
-            x, y, size = cloud
-            pygame.draw.circle(surface, WHITE, (int(x), int(y)), size // 3)
-            pygame.draw.circle(surface, WHITE, (int(x + size // 3), int(y - 10)), size // 2)
-            pygame.draw.circle(surface, WHITE, (int(x + size * 0.65), int(y)), size // 3)
-            pygame.draw.rect(
-                surface,
-                WHITE,
-                (int(x - size // 3), int(y), int(size), int(size // 4))
-            )
-
-            cloud[0] -= 0.35
-            if cloud[0] < -150:
-                cloud[0] = WIDTH + random.randint(20, 200)
-                cloud[1] = random.randint(50, 250)
-
-        # Ground
+        # Chão
         pygame.draw.rect(surface, GROUND, (0, HEIGHT - 55, WIDTH, 55))
         pygame.draw.rect(surface, GREEN, (0, HEIGHT - 55, WIDTH, 8))
 
@@ -356,23 +332,23 @@ class Game:
                 3,
             )
 
-    # Desenha pontuação, HP, sala, progresso e alguns upgrades.
+    # Desenha pontuação, vida, sala, progresso e melhorias ativas.
     def draw_hud(self, surface):
-        # Top-left
-        text = FONT.render(f"Score: {self.score}", True, WHITE)
+        # Canto superior esquerdo
+        text = FONT.render(f"Pontuação: {self.score}", True, WHITE)
         surface.blit(text, (18, 15))
 
-        text = SMALL.render(f"Best: {self.best}", True, WHITE)
+        text = SMALL.render(f"Recorde: {self.best}", True, WHITE)
         surface.blit(text, (20, 46))
 
-        text = SMALL.render(f"Room: {self.room}  |  Level: {self.level}", True, WHITE)
+        text = SMALL.render(f"Sala: {self.room}  |  Nível: {self.level}", True, WHITE)
         surface.blit(text, (20, 70))
 
-        text = SMALL.render(f"XP: {self.xp}/{self.xp_to_next}", True, WHITE)
+        text = SMALL.render(f"EXP: {self.xp}/{self.xp_to_next}", True, WHITE)
         surface.blit(text, (20, 94))
 
-        # HP
-        hp_text = SMALL.render("HP:", True, WHITE)
+        # Vida
+        hp_text = SMALL.render("VIDA:", True, WHITE)
         surface.blit(hp_text, (WIDTH - 175, 18))
 
         for i in range(self.bird.max_hp):
@@ -380,7 +356,7 @@ class Game:
             color = RED if i < self.bird.hp else (95, 70, 75)
             pygame.draw.circle(surface, color, (x, 29), 8)
 
-        # Room progress
+        # Progresso da sala
         bar_w = 220
         progress = min(1, self.room_progress / self.room_length)
         pygame.draw.rect(surface, BLACK, (WIDTH - bar_w - 20, 50, bar_w, 16), border_radius=7)
@@ -390,24 +366,21 @@ class Game:
             (WIDTH - bar_w - 20, 50, int(bar_w * progress), 16),
             border_radius=7,
         )
-        label = SMALL.render("Next upgrade", True, WHITE)
+        label = SMALL.render("Próxima melhoria", True, WHITE)
         surface.blit(label, (WIDTH - bar_w - 20, 70))
 
-        # Active upgrade stats
+        # Indicadores das melhorias ativas
         stats = [
-            f"Coins: {self.coins_collected}",
-            f"Flap: +{getattr(self.bird, 'flap_upgrades', 0)}",
-            f"Gravity: -{getattr(self.bird, 'gravity_upgrades', 0) * 8}%",
-            f"Armor: {self.bird.armor}",
-            f"Magnet: {self.bird.magnet}",
-            f"Weapon: {self.bird.weapon_damage} dmg / {self.bird.weapon_cooldown} cd",
+            f"Asas: +{getattr(self.bird, 'flap_upgrades', 0)}",
+            f"Grav.: -{getattr(self.bird, 'gravity_upgrades', 0) * 8}%",
+            f"Armadura: {self.bird.armor}",
+            f"Ímã: {self.bird.magnet}",
+            f"Arma: {self.bird.weapon_damage} dano / recarga {self.bird.weapon_cooldown}",
         ]
 
         x = 18
         y = HEIGHT - 43
-        for i, s in enumerate(stats):
-            if i == 0:
-                continue
+        for s in stats:
             txt = SMALL.render(s, True, BLACK)
             surface.blit(txt, (x, y))
             x += txt.get_width() + 18
@@ -419,9 +392,13 @@ class Game:
             pygame.draw.rect(surface, BLACK, box, border_radius=8)
             surface.blit(msg, msg.get_rect(center=box.center))
 
-    # Desenha o pássaro usando apenas formas do Pygame.
+    # Desenha a partida e a interface.
     def draw(self, surface):
         self.draw_background(surface)
+
+        if self.state == "tutorial":
+            self.draw_tutorial(surface)
+            return
 
         for pipe in self.pipes:
             pipe.draw(surface)
@@ -447,15 +424,45 @@ class Game:
         overlay.fill((0, 0, 0, 155))
         surface.blit(overlay, (0, 0))
 
-    # Desenha as três opções de upgrade.
+    def draw_tutorial(self, surface):
+        self.draw_overlay(surface)
+
+        panel = pygame.Rect(75, 55, WIDTH - 150, HEIGHT - 110)
+        pygame.draw.rect(surface, (40, 45, 60), panel, border_radius=16)
+        pygame.draw.rect(surface, YELLOW, panel, 3, border_radius=16)
+
+        title = HUGE.render("COMO JOGAR", True, YELLOW)
+        surface.blit(title, title.get_rect(center=(WIDTH // 2, 112)))
+
+        instructions = [
+            "ESPAÇO, ↑, W ou clique: bata as asas para subir; solte para descer.",
+            "X ou F: dispare para destruir canos. Os vermelhos bloqueiam a passagem.",
+            "Evite os canos, o teto e o chão; colisões fazem você perder vida.",
+            "Canos com marcador azul atiram projéteis contra você.",
+            "Recolha moedas para ganhar pontos. Passe por 12 canos para avançar de sala.",
+            "Destruir canos dá EXP; subir de nível deixa os próximos canos mais fortes.",
+            "Ao concluir uma sala, escolha uma melhoria com 1, 2 ou 3 ou clique nela.",
+        ]
+        for index, instruction in enumerate(instructions):
+            text = SMALL.render(instruction, True, WHITE)
+            surface.blit(text, (panel.x + 30, 190 + index * 42))
+
+        prompt = FONT.render(
+            "Pressione ENTER ou ESPAÇO (ou clique) para começar",
+            True,
+            YELLOW,
+        )
+        surface.blit(prompt, prompt.get_rect(center=(WIDTH // 2, 500)))
+
+    # Desenha as três opções de melhoria.
     def draw_upgrade(self, surface):
         self.draw_overlay(surface)
 
-        title = HUGE.render("ROOM CLEARED!", True, YELLOW)
+        title = HUGE.render("SALA CONCLUÍDA!", True, YELLOW)
         surface.blit(title, title.get_rect(center=(WIDTH // 2, 85)))
 
         subtitle = FONT.render(
-            "Choose an upgrade: press 1, 2 or 3",
+            "Escolha uma melhoria: pressione 1, 2 ou 3",
             True,
             WHITE,
         )
@@ -493,7 +500,7 @@ class Game:
                 name_s.get_rect(center=(x + card_w // 2, y + 65))
             )
 
-            # Word-wrap description.
+            # Quebra a descrição em linhas para caber no cartão.
             words = desc.split()
             lines = []
             line = ""
@@ -514,7 +521,7 @@ class Game:
                     ds.get_rect(center=(x + card_w // 2, y + 125 + j * 25))
                 )
 
-            # Flavor icon
+            # Ícone decorativo
             pygame.draw.circle(
                 surface,
                 BLUE,
@@ -529,28 +536,28 @@ class Game:
                 3,
             )
 
-    # Desenha a tela de Game Over.
+    # Desenha a tela de fim de jogo.
     def draw_game_over(self, surface):
         self.draw_overlay(surface)
 
-        title = HUGE.render("GAME OVER", True, RED)
+        title = HUGE.render("FIM DE JOGO", True, RED)
         surface.blit(title, title.get_rect(center=(WIDTH // 2, 180)))
 
         lines = [
-            f"Score: {self.score}",
-            f"Best: {self.best}",
-            f"Room reached: {self.room}",
-            f"Coins: {self.coins_collected}",
+            f"Pontuação: {self.score}",
+            f"Recorde: {self.best}",
+            f"Sala alcançada: {self.room}",
+            f"Moedas: {self.coins_collected}",
         ]
 
         for i, line in enumerate(lines):
             t = FONT.render(line, True, WHITE)
             surface.blit(t, t.get_rect(center=(WIDTH // 2, 260 + i * 38)))
 
-        restart = BIG.render("Press R to play again", True, YELLOW)
+        restart = BIG.render("Pressione R para jogar novamente", True, YELLOW)
         surface.blit(restart, restart.get_rect(center=(WIDTH // 2, 455)))
 
-        quit_t = SMALL.render("ESC to quit", True, WHITE)
+        quit_t = SMALL.render("ESC para sair", True, WHITE)
         surface.blit(quit_t, quit_t.get_rect(center=(WIDTH // 2, 505)))
 
 
