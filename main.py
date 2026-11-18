@@ -19,32 +19,43 @@ def main():
                 sys.exit()
 
             if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_ESCAPE:
+                if game.credits_open:
+                    if event.key == pygame.K_ESCAPE:
+                        game.close_credits()
+                elif event.key == pygame.K_ESCAPE:
                     pygame.quit()
                     sys.exit()
+                else:
+                    if game.state == "tutorial":
+                        if event.key in (pygame.K_RETURN, pygame.K_SPACE, pygame.K_UP, pygame.K_w):
+                            game.start()
+                    elif event.key in (pygame.K_SPACE, pygame.K_UP, pygame.K_w):
+                        game.flap()
+                    elif event.key in (pygame.K_x, pygame.K_f):
+                        game.shoot()
 
-                if game.state == "tutorial":
-                    if event.key in (pygame.K_RETURN, pygame.K_SPACE, pygame.K_UP, pygame.K_w):
-                        game.start()
-                elif event.key in (pygame.K_SPACE, pygame.K_UP, pygame.K_w):
-                    game.flap()
-                elif event.key in (pygame.K_x, pygame.K_f):
-                    game.shoot()
+                    if game.state == "upgrade":
+                        if event.key == pygame.K_1:
+                            game.apply_upgrade(0)
+                        elif event.key == pygame.K_2:
+                            game.apply_upgrade(1)
+                        elif event.key == pygame.K_3:
+                            game.apply_upgrade(2)
 
-                if game.state == "upgrade":
-                    if event.key == pygame.K_1:
-                        game.apply_upgrade(0)
-                    elif event.key == pygame.K_2:
-                        game.apply_upgrade(1)
-                    elif event.key == pygame.K_3:
-                        game.apply_upgrade(2)
-
-                elif game.state == "game_over":
-                    if event.key == pygame.K_r:
-                        game.reset()
+                    elif game.state == "game_over":
+                        if event.key == pygame.K_r:
+                            game.reset()
 
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                if game.state == "tutorial":
+                if game.credits_open:
+                    if game.credits_close_rect().collidepoint(event.pos):
+                        game.close_credits()
+                elif (
+                    game.state in ("tutorial", "game_over")
+                    and game.credits_button_rect().collidepoint(event.pos)
+                ):
+                    game.open_credits()
+                elif game.state == "tutorial":
                     game.start()
                 elif game.state == "playing":
                     game.flap()

@@ -19,7 +19,7 @@
 - **Progredir:** recolha moedas para ganhar pontos. Passar por 12 canos conclui a sala e oferece três melhorias; escolha uma com `1`, `2` ou `3`, ou clique no cartão.
 - **Subir de nível:** destruir canos concede EXP. Cada nível aumenta a resistência e o dano dos canos seguintes.
 - **Melhorias:** elas podem fortalecer o voo, reduzir a gravidade, aumentar a vida e a armadura, atrair moedas, acelerar os disparos ou melhorar pontuação e velocidade.
-- **Fim de jogo:** pressione `R` para iniciar outra partida ou `ESC` para sair.
+- **Fim de jogo:** pressione `R` para iniciar outra partida ou `ESC` para sair. O botão **Créditos**, disponível na tela inicial e no fim de jogo, mostra as informações do projeto.
 
 ## Estrutura
 

@@ -46,6 +46,22 @@ class Game:
         self.message_timer = 0
 
         self.ground_scroll = 0
+        self.credits_open = False
+
+    @staticmethod
+    def credits_button_rect():
+        return pygame.Rect(WIDTH - 170, HEIGHT - 58, 145, 40)
+
+    @staticmethod
+    def credits_close_rect():
+        return pygame.Rect(WIDTH // 2 - 75, 420, 150, 42)
+
+    def open_credits(self):
+        if self.state in ("tutorial", "game_over"):
+            self.credits_open = True
+
+    def close_credits(self):
+        self.credits_open = False
 
     # A dificuldade aumenta conforme o jogador avança pelas salas.
     def difficulty(self):
@@ -398,6 +414,9 @@ class Game:
 
         if self.state == "tutorial":
             self.draw_tutorial(surface)
+            self.draw_credits_button(surface)
+            if self.credits_open:
+                self.draw_credits(surface)
             return
 
         for pipe in self.pipes:
@@ -418,6 +437,10 @@ class Game:
             self.draw_upgrade(surface)
         elif self.state == "game_over":
             self.draw_game_over(surface)
+            self.draw_credits_button(surface)
+
+        if self.credits_open:
+            self.draw_credits(surface)
 
     def draw_overlay(self, surface):
         overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
@@ -453,6 +476,38 @@ class Game:
             YELLOW,
         )
         surface.blit(prompt, prompt.get_rect(center=(WIDTH // 2, 500)))
+
+    def draw_credits_button(self, surface):
+        rect = self.credits_button_rect()
+        pygame.draw.rect(surface, (40, 45, 60), rect, border_radius=8)
+        pygame.draw.rect(surface, YELLOW, rect, 2, border_radius=8)
+        label = SMALL.render("Créditos", True, WHITE)
+        surface.blit(label, label.get_rect(center=rect.center))
+
+    def draw_credits(self, surface):
+        self.draw_overlay(surface)
+
+        panel = pygame.Rect(150, 155, WIDTH - 300, 310)
+        pygame.draw.rect(surface, (40, 45, 60), panel, border_radius=16)
+        pygame.draw.rect(surface, YELLOW, panel, 3, border_radius=16)
+
+        title = HUGE.render("CRÉDITOS", True, YELLOW)
+        surface.blit(title, title.get_rect(center=(WIDTH // 2, 220)))
+
+        lines = [
+            "Flappy Bird Roguelike",
+            "Desenvolvido por Abner Chub, Davi Willian, ",
+            "Lucas Coleti e Matheus Pereira",
+        ]
+        for index, line in enumerate(lines):
+            text = FONT.render(line, True, WHITE)
+            surface.blit(text, text.get_rect(center=(WIDTH // 2, 295 + index * 38)))
+
+        rect = self.credits_close_rect()
+        pygame.draw.rect(surface, (40, 45, 60), rect, border_radius=8)
+        pygame.draw.rect(surface, YELLOW, rect, 2, border_radius=8)
+        label = SMALL.render("Voltar", True, WHITE)
+        surface.blit(label, label.get_rect(center=rect.center))
 
     # Desenha as três opções de melhoria.
     def draw_upgrade(self, surface):
